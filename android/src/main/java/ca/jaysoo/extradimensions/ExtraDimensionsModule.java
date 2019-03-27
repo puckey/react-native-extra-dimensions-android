@@ -10,6 +10,7 @@ import android.view.Display;
 import android.provider.Settings;
 import android.content.res.Resources;
 import android.view.WindowManager;
+import android.view.ViewConfiguration;
 
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.LifecycleEventListener;
