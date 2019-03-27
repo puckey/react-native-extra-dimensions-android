@@ -82,6 +82,11 @@ public class ExtraDimensionsModule extends ReactContextBaseJavaModule implements
         return constants;
     }
 
+    private boolean hasPermanentMenuKey() {
+        final Context ctx = getReactApplicationContext();
+        return ViewConfiguration.get(ctx).hasPermanentMenuKey();
+    }
+    
     private float getStatusBarHeight(DisplayMetrics metrics) {
         final Context ctx = getReactApplicationContext();
         final int heightResId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
