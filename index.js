@@ -2,11 +2,7 @@ const React = require('react');
 var { NativeModules, Platform } = require('react-native');
 
 if (Platform.OS === 'android') {
-  module.exports = {
-    get(dim) {
-      return NativeModules.ExtraDimensions[dim];
-    }
-  };
+  module.exports = NativeModules.ExtraDimensions;
 } else {
   module.exports = {
     get(dim) {

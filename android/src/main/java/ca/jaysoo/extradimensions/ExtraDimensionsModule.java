@@ -11,6 +11,7 @@ import android.provider.Settings;
 import android.content.res.Resources;
 import android.view.WindowManager;
 import android.view.ViewConfiguration;
+import android.graphics.Point;
 
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -73,13 +74,10 @@ public class ExtraDimensionsModule extends ReactContextBaseJavaModule implements
             } catch (NoSuchMethodException e) {
             }
         }
-
-        constants.put("REAL_WINDOW_HEIGHT", getRealHeight(metrics));
-        constants.put("REAL_WINDOW_WIDTH", getRealWidth(metrics));
-        constants.put("STATUS_BAR_HEIGHT", getStatusBarHeight(metrics));
-        constants.put("SOFT_MENU_BAR_HEIGHT", getSoftMenuBarHeight(metrics));
-        constants.put("SMART_BAR_HEIGHT", getSmartBarHeight(metrics));
-
+        constants.put("statusBarHeight", getStatusBarHeight(metrics));
+        final Point navigationBarSize = getNavigationBarSize(ctx);
+        constants.put("navigationBarHeight", Math.round(navigationBarSize.y / metrics.density));
+        constants.put("navigationBarWidth", Math.round(navigationBarSize.x / metrics.density));
         return constants;
     }
 
@@ -87,7 +85,7 @@ public class ExtraDimensionsModule extends ReactContextBaseJavaModule implements
         final Context ctx = getReactApplicationContext();
         return ViewConfiguration.get(ctx).hasPermanentMenuKey();
     }
-    
+
     private float getStatusBarHeight(DisplayMetrics metrics) {
         final Context ctx = getReactApplicationContext();
         final int heightResId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
@@ -97,81 +95,46 @@ public class ExtraDimensionsModule extends ReactContextBaseJavaModule implements
             : 0;
     }
 
-    private float getSoftMenuBarHeight(DisplayMetrics metrics) {
-        if(hasPermanentMenuKey()) {
-            return 0;
+    public static Point getNavigationBarSize(Context context) {
+        Point appUsableSize = getAppUsableScreenSize(context);
+        Point realScreenSize = getRealScreenSize(context);
+
+        // navigation bar on the side
+        if (appUsableSize.x < realScreenSize.x) {
+            return new Point(realScreenSize.x - appUsableSize.x, appUsableSize.y);
         }
 
-        final Context ctx = getReactApplicationContext();
-        final float realHeight = getRealHeight(metrics);
-        final DisplayMetrics usableMetrics = ctx.getResources().getDisplayMetrics();
-
-        // Passing getMetrics will update the value of the Object DisplayMetrics metrics
-        ((WindowManager) mReactContext.getSystemService(Context.WINDOW_SERVICE))
-                .getDefaultDisplay().getMetrics(metrics);
-
-        final int usableHeight = usableMetrics.heightPixels;
-
-        final int heightResId = ctx.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
-
-        final int Height1 = (int) Math.max(0, realHeight - usableHeight / metrics.density);
-        final int Height2 = heightResId > 0 ? (int) (ctx.getResources().getDimensionPixelSize(heightResId) / metrics.density) : 0;
-
-        return Height1 == 0 ? Height1 : Height2;
-    }
-
-    private float getRealHeight(DisplayMetrics metrics) {
-        return metrics.heightPixels / metrics.density;
-    }
-
-    private float getRealWidth(DisplayMetrics metrics) {
-        return metrics.widthPixels / metrics.density;
-    }
-
-    // 获取魅族SmartBar高度
-    private float getSmartBarHeight(DisplayMetrics metrics) {
-        final Context context = getReactApplicationContext();
-        final boolean isMeiZu = Build.MANUFACTURER.equals("Meizu");
- 
-        final boolean autoHideSmartBar = Settings.System.getInt(context.getContentResolver(),
-            "mz_smartbar_auto_hide", 0) == 1;
- 
-        if (isMeiZu) {
-            if (autoHideSmartBar) {
-                return 0;
-            } else {
-                try {
-                    Class c = Class.forName("com.android.internal.R$dimen");
-                    Object obj = c.newInstance();
-                    Field field = c.getField("mz_action_button_min_height");
-                    int height = Integer.parseInt(field.get(obj).toString());
-                    return context.getResources().getDimensionPixelSize(height) / metrics.density;
-                } catch (Throwable e) { // 不自动隐藏smartbar同时又没有smartbar高度字段供访问，取系统navigationbar的高度
-                    return getNormalNavigationBarHeight(context) / metrics.density;
-                }
-            }
-        } else {
-            return 0;
-            //return getNormalNavigationBarHeight(context) / metrics.density;
+        // navigation bar at the bottom
+        if (appUsableSize.y < realScreenSize.y) {
+            return new Point(appUsableSize.x, realScreenSize.y - appUsableSize.y);
         }
+
+        // navigation bar is not present
+        return new Point();
     }
- 
-    protected static float getNormalNavigationBarHeight(final Context ctx) {
-        try {
-            final Resources res = ctx.getResources();
-            int rid = res.getIdentifier("config_showNavigationBar", "bool", "android");
-            if (rid > 0) {
-                boolean flag = res.getBoolean(rid);
-                if (flag) {
-                    int resourceId = res.getIdentifier("navigation_bar_height", "dimen", "android");
-                    if (resourceId > 0) {
-                        return res.getDimensionPixelSize(resourceId);
-                    }
-                }
-            }
-        } catch (Throwable e) {
-            return 0;
+
+    public static Point getAppUsableScreenSize(Context context) {
+        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = windowManager.getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        return size;
+    }
+
+    public static Point getRealScreenSize(Context context) {
+        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = windowManager.getDefaultDisplay();
+        Point size = new Point();
+
+        if (Build.VERSION.SDK_INT >= 17) {
+            display.getRealSize(size);
+        } else if (Build.VERSION.SDK_INT >= 14) {
+            try {
+                size.x = (Integer) Display.class.getMethod("getRawWidth").invoke(display);
+                size.y = (Integer) Display.class.getMethod("getRawHeight").invoke(display);
+            } catch (IllegalAccessException e) {} catch (InvocationTargetException e) {} catch (NoSuchMethodException e) {}
         }
-        return 0;
+
+        return size;
     }
 }
